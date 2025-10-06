@@ -1,3 +1,4 @@
+// ManipulatorControl.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -19,11 +20,11 @@ import {
   DialogContent,
   DialogActions,
   Chip,
-  Grid
+  Container,
+  Stack
 } from '@mui/material';
 import { PlayArrow, Logout } from '@mui/icons-material';
 
-// Типы
 interface Position {
   x: number;
   y: number;
@@ -44,7 +45,6 @@ interface HistoryRecord {
   samplesAfter: Sample[];
 }
 
-// Компонент авторизации
 const LoginForm = ({ onLogin }: { onLogin: () => void }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -73,7 +73,7 @@ const LoginForm = ({ onLogin }: { onLogin: () => void }) => {
         <Typography variant="h5" align="center" gutterBottom>
           Вход в систему
         </Typography>
-        <form onSubmit={handleSubmit}>
+        <Box component="form" onSubmit={handleSubmit}>
           <TextField
             fullWidth
             label="Логин"
@@ -100,20 +100,23 @@ const LoginForm = ({ onLogin }: { onLogin: () => void }) => {
           >
             Войти
           </Button>
-        </form>
+          <Typography marginTop={2}>
+            Login: admin
+          </Typography>
+          <Typography>
+            Parol: admin
+          </Typography>
+        </Box>
       </Paper>
     </Box>
   );
 };
 
-// Функция оптимизации команд
 const optimizeCommands = (commands: string): string => {
   let result = commands;
   
-  // Сжатие повторяющихся команд
   result = result.replace(/(.)\1+/g, (match, char) => `${match.length}${char}`);
   
-  // Поиск повторяющихся паттернов
   const findRepeatingPattern = (str: string): string => {
     for (let len = 1; len <= str.length / 2; len++) {
       let pattern = str.substring(0, len);
@@ -132,7 +135,6 @@ const optimizeCommands = (commands: string): string => {
     return str;
   };
   
-  // Применяем поиск паттернов
   const segments = result.split(/([ОБ])/);
   result = segments.map(seg => {
     if (seg === 'О' || seg === 'Б' || seg === '') return seg;
@@ -142,7 +144,6 @@ const optimizeCommands = (commands: string): string => {
   return result;
 };
 
-// Основное приложение
 const ManipulatorControl = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [commands, setCommands] = useState('');
@@ -157,7 +158,6 @@ const ManipulatorControl = () => {
 
   const gridSize = 8;
 
-  // Генерация образцов
   useEffect(() => {
     if (isLoggedIn && samples.length === 0) {
       const newSamples: Sample[] = [];
@@ -174,7 +174,47 @@ const ManipulatorControl = () => {
     }
   }, [isLoggedIn]);
 
-  // Выполнение команд
+  const expandCommands = (cmd: string): string[] => {
+    const result: string[] = [];
+    let i = 0;
+    
+    while (i < cmd.length) {
+      if (/\d/.test(cmd[i])) {
+        let num = '';
+        while (i < cmd.length && /\d/.test(cmd[i])) {
+          num += cmd[i];
+          i++;
+        }
+        
+        if (cmd[i] === '(') {
+          let depth = 1;
+          let pattern = '';
+          i++;
+          while (i < cmd.length && depth > 0) {
+            if (cmd[i] === '(') depth++;
+            if (cmd[i] === ')') depth--;
+            if (depth > 0) pattern += cmd[i];
+            i++;
+          }
+          const expanded = expandCommands(pattern);
+          for (let j = 0; j < parseInt(num); j++) {
+            result.push(...expanded);
+          }
+        } else {
+          for (let j = 0; j < parseInt(num); j++) {
+            result.push(cmd[i]);
+          }
+          i++;
+        }
+      } else {
+        result.push(cmd[i]);
+        i++;
+      }
+    }
+    
+    return result;
+  };
+
   const executeCommands = async () => {
     const optimized = optimizeCommands(commands);
     const samplesBefore = JSON.parse(JSON.stringify(samples));
@@ -183,48 +223,6 @@ const ManipulatorControl = () => {
     let currentPos = { x: 0, y: 0 };
     setPosition(currentPos);
     let holding: number | null = null;
-    
-    // Парсинг и выполнение команд
-    const expandCommands = (cmd: string): string[] => {
-      const result: string[] = [];
-      let i = 0;
-      
-      while (i < cmd.length) {
-        if (/\d/.test(cmd[i])) {
-          let num = '';
-          while (i < cmd.length && /\d/.test(cmd[i])) {
-            num += cmd[i];
-            i++;
-          }
-          
-          if (cmd[i] === '(') {
-            let depth = 1;
-            let pattern = '';
-            i++;
-            while (i < cmd.length && depth > 0) {
-              if (cmd[i] === '(') depth++;
-              if (cmd[i] === ')') depth--;
-              if (depth > 0) pattern += cmd[i];
-              i++;
-            }
-            const expanded = expandCommands(pattern);
-            for (let j = 0; j < parseInt(num); j++) {
-              result.push(...expanded);
-            }
-          } else {
-            for (let j = 0; j < parseInt(num); j++) {
-              result.push(cmd[i]);
-            }
-            i++;
-          }
-        } else {
-          result.push(cmd[i]);
-          i++;
-        }
-      }
-      
-      return result;
-    };
     
     const cmdArray = expandCommands(optimized);
     
@@ -291,79 +289,210 @@ const ManipulatorControl = () => {
 
   return (
     <Box sx={{ p: 3, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4">Управление манипулятором</Typography>
-        <Button
-          variant="outlined"
-          startIcon={<Logout />}
-          onClick={() => setIsLoggedIn(false)}
-        >
-          Выйти
-        </Button>
-      </Box>
+      <Container maxWidth="xl">
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4">Управление манипулятором</Typography>
+          <Button
+            variant="outlined"
+            startIcon={<Logout />}
+            onClick={() => setIsLoggedIn(false)}
+          >
+            Выйти
+          </Button>
+        </Stack>
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Ввод команд
-            </Typography>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              value={commands}
-              onChange={(e) => setCommands(e.target.value.toUpperCase())}
-              placeholder="Л, П, В, Н, О, Б"
-              sx={{ mb: 2 }}
-            />
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Оптимизированная: {optimizeCommands(commands)}
-            </Typography>
-            <Box sx={{ mt: 3 }}>
-              <Typography gutterBottom>
-                Скорость анимации: {speed}ms
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+          <Box>
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Ввод команд
               </Typography>
-              <Slider
-                value={speed}
-                onChange={(_, val) => setSpeed(val as number)}
-                min={100}
-                max={1000}
-                step={50}
-                disabled={isAnimating}
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                value={commands}
+                onChange={(e) => setCommands(e.target.value.toUpperCase())}
+                placeholder="Л, П, В, Н, О, Б"
+                sx={{ mb: 2 }}
               />
-            </Box>
-            <Button
-              fullWidth
-              variant="contained"
-              startIcon={<PlayArrow />}
-              onClick={executeCommands}
-              disabled={isAnimating || !commands}
-              sx={{ mt: 2 }}
-            >
-              Выполнить
-            </Button>
-          </Paper>
-
-          <Paper sx={{ p: 3, mt: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6">История</Typography>
-              <Button onClick={() => setHistoryDialog(true)}>
-                Подробнее
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Оптимизированная: {optimizeCommands(commands)}
+              </Typography>
+              <Box sx={{ mt: 3 }}>
+                <Typography gutterBottom>
+                  Скорость анимации: {speed}ms
+                </Typography>
+                <Slider
+                  value={speed}
+                  onChange={(_, val) => setSpeed(val as number)}
+                  min={100}
+                  max={1000}
+                  step={50}
+                  disabled={isAnimating}
+                />
+              </Box>
+              <Button
+                fullWidth
+                variant="contained"
+                startIcon={<PlayArrow />}
+                onClick={executeCommands}
+                disabled={isAnimating || !commands}
+                sx={{ mt: 2 }}
+              >
+                Выполнить
               </Button>
-            </Box>
-            <TableContainer sx={{ maxHeight: 300 }}>
-              <Table size="small">
+            </Paper>
+
+            <Paper sx={{ p: 3 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6">История</Typography>
+                <Button onClick={() => setHistoryDialog(true)}>
+                  Подробнее
+                </Button>
+              </Stack>
+              <TableContainer sx={{ maxHeight: 300 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Время</TableCell>
+                      <TableCell>Исходная</TableCell>
+                      <TableCell>Оптимизированная</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {history.slice(0, 5).map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{record.time}</TableCell>
+                        <TableCell>{record.original}</TableCell>
+                        <TableCell>{record.optimized}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Box>
+
+          <Box>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Визуализация стола
+              </Typography>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
+                  gap: 1,
+                  aspectRatio: '1',
+                  bgcolor: '#e0e0e0',
+                  p: 2,
+                  borderRadius: 2
+                }}
+              >
+                {Array.from({ length: gridSize * gridSize }).map((_, idx) => {
+                  const x = idx % gridSize;
+                  const y = Math.floor(idx / gridSize);
+                  const isManipulator = position.x === x && position.y === y;
+                  const sample = samples.find(s => s.position.x === x && s.position.y === y);
+                  const isHeld = sample && holdingSample === sample.id;
+
+                  return (
+                    <Box
+                      key={idx}
+                      sx={{
+                        bgcolor: isManipulator ? '#2196f3' : '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      {isManipulator && (
+                        <Box
+                          sx={{
+                            width: '60%',
+                            height: '60%',
+                            bgcolor: '#1976d2',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {holdingSample && (
+                            <Box
+                              sx={{
+                                width: '50%',
+                                height: '50%',
+                                bgcolor: '#ff9800',
+                                borderRadius: '50%'
+                              }}
+                            />
+                          )}
+                        </Box>
+                      )}
+                      {sample && !isHeld && (
+                        <Box
+                          sx={{
+                            width: '50%',
+                            height: '50%',
+                            bgcolor: '#ff9800',
+                            borderRadius: '50%'
+                          }}
+                        />
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
+              <Stack direction="row" spacing={2} justifyContent="center" mt={2}>
+                <Chip label="Манипулятор" sx={{ bgcolor: '#2196f3', color: 'white' }} />
+                <Chip label="Образец" sx={{ bgcolor: '#ff9800', color: 'white' }} />
+              </Stack>
+              
+              <Paper sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5' }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Текущая позиция:
+                </Typography>
+                <Typography variant="body2">
+                  X: {position.x}, Y: {position.y}
+                </Typography>
+                {holdingSample && (
+                  <Typography variant="body2" color="warning.main" mt={1}>
+                    🔸 Удерживает образец #{holdingSample}
+                  </Typography>
+                )}
+              </Paper>
+            </Paper>
+          </Box>
+        </Box>
+
+        <Dialog
+          open={historyDialog}
+          onClose={() => setHistoryDialog(false)}
+          maxWidth="lg"
+          fullWidth
+        >
+          <DialogTitle>Полная история операций</DialogTitle>
+          <DialogContent>
+            <TableContainer>
+              <Table>
                 <TableHead>
                   <TableRow>
+                    <TableCell>Дата</TableCell>
                     <TableCell>Время</TableCell>
-                    <TableCell>Исходная</TableCell>
+                    <TableCell>Исходная команда</TableCell>
                     <TableCell>Оптимизированная</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {history.slice(0, 5).map((record) => (
+                  {history.map((record) => (
                     <TableRow key={record.id}>
+                      <TableCell>{record.date}</TableCell>
                       <TableCell>{record.time}</TableCell>
                       <TableCell>{record.original}</TableCell>
                       <TableCell>{record.optimized}</TableCell>
@@ -372,137 +501,22 @@ const ManipulatorControl = () => {
                 </TableBody>
               </Table>
             </TableContainer>
-          </Paper>
-        </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setHistoryDialog(false)}>Закрыть</Button>
+          </DialogActions>
+        </Dialog>
 
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Визуализация стола
-            </Typography>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
-                gap: 1,
-                aspectRatio: '1',
-                bgcolor: '#e0e0e0',
-                p: 2,
-                borderRadius: 2
-              }}
-            >
-              {Array.from({ length: gridSize * gridSize }).map((_, idx) => {
-                const x = idx % gridSize;
-                const y = Math.floor(idx / gridSize);
-                const isManipulator = position.x === x && position.y === y;
-                const sample = samples.find(s => s.position.x === x && s.position.y === y);
-                const isHeld = sample && holdingSample === sample.id;
-
-                return (
-                  <Box
-                    key={idx}
-                    sx={{
-                      bgcolor: isManipulator ? '#2196f3' : '#fff',
-                      border: '1px solid #ccc',
-                      borderRadius: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    {isManipulator && (
-                      <Box
-                        sx={{
-                          width: '60%',
-                          height: '60%',
-                          bgcolor: '#1976d2',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        {holdingSample && (
-                          <Box
-                            sx={{
-                              width: '50%',
-                              height: '50%',
-                              bgcolor: '#ff9800',
-                              borderRadius: '50%'
-                            }}
-                          />
-                        )}
-                      </Box>
-                    )}
-                    {sample && !isHeld && (
-                      <Box
-                        sx={{
-                          width: '50%',
-                          height: '50%',
-                          bgcolor: '#ff9800',
-                          borderRadius: '50%'
-                        }}
-                      />
-                    )}
-                  </Box>
-                );
-              })}
-            </Box>
-            <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'center' }}>
-              <Chip label="Манипулятор" sx={{ bgcolor: '#2196f3', color: 'white' }} />
-              <Chip label="Образец" sx={{ bgcolor: '#ff9800', color: 'white' }} />
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      <Dialog
-        open={historyDialog}
-        onClose={() => setHistoryDialog(false)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle>Полная история операций</DialogTitle>
-        <DialogContent>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Дата</TableCell>
-                  <TableCell>Время</TableCell>
-                  <TableCell>Исходная команда</TableCell>
-                  <TableCell>Оптимизированная</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {history.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell>{record.date}</TableCell>
-                    <TableCell>{record.time}</TableCell>
-                    <TableCell>{record.original}</TableCell>
-                    <TableCell>{record.optimized}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setHistoryDialog(false)}>Закрыть</Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-      >
-        <Alert severity="success" variant="filled">
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={3000}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        >
+          <Alert severity="success" variant="filled">
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Container>
     </Box>
   );
 };
